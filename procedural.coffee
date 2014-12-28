@@ -8,6 +8,8 @@ document.body.appendChild renderer.domElement
 
 camera.position.z = 5
 
+THREE.Vector3.prototype.toString = -> "<#{@x}, #{@y}, #{@z}>"
+
 tileSquare = (corner1, corner2, normal, segments) ->
   geometry = new THREE.Geometry
 
@@ -16,11 +18,13 @@ tileSquare = (corner1, corner2, normal, segments) ->
   diagonal2 = new THREE.Vector3().crossVectors(normal, diagonal1).setLength(diagonalLength / 2)
 
   a = corner1
-  b = corner1.clone().addVectors(diagonal1, diagonal2)
+  b = corner1.clone().add(diagonal1).add(diagonal2)
   c = corner2
 
   vertical   = new THREE.Vector3().subVectors(b, a).divideScalar(segments)
   horizontal = new THREE.Vector3().subVectors(c, b).divideScalar(segments)
+
+  console.log a, b, c
 
   i = 0
   start = corner1.clone()
@@ -44,22 +48,36 @@ tileSquare = (corner1, corner2, normal, segments) ->
   geometry.mergeVertices()
   return geometry
 
-
 do ->
-  geometry = tileSquare(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 2, 0), new THREE.Vector3(0, 0, 1), 5)
   material = new THREE.MeshBasicMaterial { color : 0x00ff00, wireframe : true }
-  mesh = new THREE.Mesh geometry, material
+  meshes = []
 
-  scene.add mesh
+  for geometry in [
+    # x-side
+    tileSquare(new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, 0, 0), 5)
+    tileSquare(new THREE.Vector3( 1, -1, 1), new THREE.Vector3( 1, 1, -1), new THREE.Vector3( 1, 0, 0), 5)
 
-  camera.position.z = 5
+    # y-side
+    tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3(1,  1, 1), new THREE.Vector3(0,  1, 0), 5)
+    tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, -1, 1), new THREE.Vector3(0, -1, 0), 5)
+
+    # z-side
+    tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, -1), new THREE.Vector3(0, 0,  1), 5)
+    tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 5)
+  ]
+    # TODO: Merge into one mesh, probably.
+    mesh = new THREE.Mesh geometry, material
+    scene.add mesh
+    meshes.push mesh
 
   # Just wrap it in a closure so we don't assign this function to `window`.
   render = ->
     requestAnimationFrame render
     renderer.render scene, camera
 
-    mesh.rotation.x += 0.02
-    mesh.rotation.y += 0.03
+    for mesh in meshes
+      mesh.rotation.x += 0.005
+      mesh.rotation.y += 0.015
+      mesh.rotation.z += 0.020
 
   render()
