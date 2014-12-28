@@ -65,6 +65,10 @@ do ->
     tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, -1), new THREE.Vector3(0, 0,  1), 5)
     tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 5)
   ]
+
+    for v in geometry.vertices
+      v.setLength 1
+
     # TODO: Merge into one mesh, probably.
     mesh = new THREE.Mesh geometry, material
     scene.add mesh
