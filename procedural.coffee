@@ -80,8 +80,8 @@ do ->
     renderer.render scene, camera
 
     for mesh in meshes
-      mesh.rotation.x += 0.005
-      mesh.rotation.y += 0.015
-      mesh.rotation.z += 0.020
+      mesh.rotation.x += 0.0005
+      mesh.rotation.y += 0.0015
+      mesh.rotation.z += 0.0020
 
   render()
