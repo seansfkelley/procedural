@@ -38,7 +38,7 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
   constructor : (material = null) ->
     g = new THREE.Geometry
 
-    for geometry in [
+    @_sphereFaceGeometries = [
       # x-side
       tileSquare(new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, 0, 0), 10)
       tileSquare(new THREE.Vector3( 1, -1, 1), new THREE.Vector3( 1, 1, -1), new THREE.Vector3( 1, 0, 0), 10)
@@ -52,11 +52,32 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
       tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 10)
     ]
 
-      for v in geometry.vertices
-        v.setLength 25
-
-      g.merge geometry, geometry.matrix
+    for faceGeometry in @_sphereFaceGeometries
+      g.merge faceGeometry, faceGeometry.matrix
 
     # Discovered this myself. Others have the same issue:
     # http://blog.olav.it/post/44702519698/subclassing-three-js-objects-in-coffeescript
     THREE.Mesh.call this, g, material
+
+    @toSphere()
+
+  toSphere : =>
+    for v in @geometry.vertices
+      v.setLength 25
+    @geometry.verticesNeedUpdate = true
+
+  toCube : =>
+    for v in @geometry.vertices
+      face = @_getFace v
+      v.multiplyScalar 25 / Math.abs(v[face])
+    @geometry.verticesNeedUpdate = true
+
+  _getFace : (v) ->
+    [ x, y, z ] = v.toArray().map Math.abs
+    if x >= y and x >= z
+      return 'x'
+    else if y >= x and y >= z
+      return 'y'
+    else if z >= x and z >= y
+      return 'z'
+    throw new Error 'math is hard'
