@@ -1,0 +1,3 @@
+- cubemapping -- how to convert an arbitrary point to a x/y position on the surface of the cube efficiently?
+- precompute quadtree for whole depth
+- break apart mesh and add/remove so that we can swap out quadtree components
