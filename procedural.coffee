@@ -4,8 +4,17 @@ camera = new THREE.PerspectiveCamera 45, window.innerWidth / window.innerHeight,
 renderer = new THREE.WebGLRenderer
 renderer.setSize window.innerWidth, window.innerHeight
 
-controls = new THREE.PointerLockControls camera
-scene.add controls.getObject()
+# controls = new THREE.PointerLockControls camera
+# scene.add controls.getObject()
+
+# controls = new THREE.FlyControls camera
+# controls.movementSpeed = 100
+# controls.rollSpeed = Math.PI / 4
+# controls.dragToLook = true
+
+controls = new THREE.PointerLockFlyControls camera
+controls.movementSpeed = 100
+controls.rollSpeed = Math.PI / 4
 
 setupPointerLock = ->
   if not 'pointerLockElement' of document
@@ -23,7 +32,7 @@ setupPointerLock = ->
   document.addEventListener 'pointerlockchange', pointerlockchange, false
   document.addEventListener 'pointerlockerror',  pointerlockerror,  false
 
-  $(document).one 'click', -> element.requestPointerLock()
+  $(document).on 'click', -> element.requestPointerLock()
 
 setupPointerLock()
 
@@ -98,7 +107,7 @@ clock = new THREE.Clock
 render = ->
   delta = clock.getDelta()
 
-  controls.update()
+  controls.update delta
 
   requestAnimationFrame render
   renderer.render scene, camera
