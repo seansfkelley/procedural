@@ -1,8 +1,31 @@
 scene = new THREE.Scene
-camera = new THREE.PerspectiveCamera 75, window.innerWidth / window.innerHeight, 0.1, 1000
+camera = new THREE.PerspectiveCamera 45, window.innerWidth / window.innerHeight, 0.1, 1000
 
 renderer = new THREE.WebGLRenderer
 renderer.setSize window.innerWidth, window.innerHeight
+
+controls = new THREE.PointerLockControls camera
+scene.add controls.getObject()
+
+setupPointerLock = ->
+  if not 'pointerLockElement' of document
+    throw new Error 'missing pointerLockElement'
+
+  element = document.body
+
+  pointerlockchange = (ev) ->
+    controls.enabled = document.pointerLockElement == element
+
+  pointerlockerror = (ev) ->
+    debugger
+    throw new Error 'pointerlockerror'
+
+  document.addEventListener 'pointerlockchange', pointerlockchange, false
+  document.addEventListener 'pointerlockerror',  pointerlockerror,  false
+
+  $(document).one 'click', -> element.requestPointerLock()
+
+setupPointerLock()
 
 document.body.appendChild renderer.domElement
 
@@ -23,8 +46,6 @@ tileSquare = (corner1, corner2, normal, segments) ->
 
   vertical   = new THREE.Vector3().subVectors(b, a).divideScalar(segments)
   horizontal = new THREE.Vector3().subVectors(c, b).divideScalar(segments)
-
-  console.log a, b, c
 
   i = 0
   start = corner1.clone()
@@ -48,40 +69,38 @@ tileSquare = (corner1, corner2, normal, segments) ->
   geometry.mergeVertices()
   return geometry
 
-do ->
-  material = new THREE.MeshBasicMaterial { color : 0x00ff00, wireframe : true }
-  meshes = []
+material = new THREE.MeshBasicMaterial { color : 0x00ff00, wireframe : true }
+meshes = []
 
-  for geometry in [
-    # x-side
-    tileSquare(new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, 0, 0), 5)
-    tileSquare(new THREE.Vector3( 1, -1, 1), new THREE.Vector3( 1, 1, -1), new THREE.Vector3( 1, 0, 0), 5)
+for geometry in [
+  # x-side
+  tileSquare(new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, 0, 0), 10)
+  tileSquare(new THREE.Vector3( 1, -1, 1), new THREE.Vector3( 1, 1, -1), new THREE.Vector3( 1, 0, 0), 10)
 
-    # y-side
-    tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3(1,  1, 1), new THREE.Vector3(0,  1, 0), 5)
-    tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, -1, 1), new THREE.Vector3(0, -1, 0), 5)
+  # y-side
+  tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3(1,  1, 1), new THREE.Vector3(0,  1, 0), 10)
+  tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, -1, 1), new THREE.Vector3(0, -1, 0), 10)
 
-    # z-side
-    tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, -1), new THREE.Vector3(0, 0,  1), 5)
-    tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 5)
-  ]
+  # z-side
+  tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, -1), new THREE.Vector3(0, 0,  1), 10)
+  tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 10)
+]
 
-    for v in geometry.vertices
-      v.setLength 1
+  for v in geometry.vertices
+    v.setLength 25
 
-    # TODO: Merge into one mesh, probably.
-    mesh = new THREE.Mesh geometry, material
-    scene.add mesh
-    meshes.push mesh
+  # TODO: Merge into one mesh, probably.
+  mesh = new THREE.Mesh geometry, material
+  scene.add mesh
+  meshes.push mesh
 
-  # Just wrap it in a closure so we don't assign this function to `window`.
-  render = ->
-    requestAnimationFrame render
-    renderer.render scene, camera
+clock = new THREE.Clock
+render = ->
+  delta = clock.getDelta()
 
-    for mesh in meshes
-      mesh.rotation.x += 0.0005
-      mesh.rotation.y += 0.0015
-      mesh.rotation.z += 0.0020
+  controls.update()
 
-  render()
+  requestAnimationFrame render
+  renderer.render scene, camera
+
+requestAnimationFrame render
