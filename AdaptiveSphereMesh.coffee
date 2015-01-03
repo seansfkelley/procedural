@@ -34,23 +34,69 @@ tileSquare = (corner1, corner2, normal, segments) ->
   geometry.mergeVertices()
   return geometry
 
+sign = (n) -> `n < 0 ? -1 : (n > 0 ? 1 : 0)`
+
 class window.AdaptiveSphereMesh extends THREE.Mesh
   constructor : (material = null) ->
     g = new THREE.Geometry
 
+    # OpenGL directionality here such that when mapped onto the standard flat texture origin is always bottom-left:
+    #       ____                      _____
+    #      |    |                    |    ↗|
+    #      | +y |                    |  ↗  |
+    #  ____|____|____ ____      _____|↗____|_____ _____
+    # |    |    |    |    |    |    ↗|    ↗|    ↗|    ↗|
+    # | -x | +z | +x | -z |    |  ↗  |  ↗  |  ↗  |  ↗  |
+    # |____|____|____|____|    |↗____|↗____|↗____|↗____|
+    #      |    |                    |    ↗|
+    #      | -y |                    |  ↗  |
+    #      |____|                    |↗____|
+    #
     @_sphereFaceGeometries = [
-      # x-side
-      tileSquare(new THREE.Vector3(-1, -1, 1), new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, 0, 0), 10)
-      tileSquare(new THREE.Vector3( 1, -1, 1), new THREE.Vector3( 1, 1, -1), new THREE.Vector3( 1, 0, 0), 10)
+      origin    : new THREE.Vector3( 1,  1,  1)
+      face      : 'x'
+      direction : 1
+    ,
+      origin    : new THREE.Vector3(-1,  1, -1)
+      face      : 'x'
+      direction : -1
+    ,
+      origin    : new THREE.Vector3(-1,  1, -1)
+      face      : 'y'
+      direction : 1
+    ,
+      origin    : new THREE.Vector3(-1, -1,  1)
+      face      : 'y'
+      direction : -1
+    ,
+      origin    : new THREE.Vector3(-1,  1,  1)
+      face      : 'z'
+      direction : 1
+    ,
+      origin    : new THREE.Vector3( 1,  1, -1)
+      face      : 'z'
+      direction : -1
+    ].map ({ origin, face, direction }) ->
+      normal = new THREE.Vector3
+      normal[face] = direction
+      target = origin.clone().negate().multiplyScalar(2).add(origin)
+      target[face] = direction
+      return tileSquare(origin, target, normal, 10)
 
-      # y-side
-      tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3(1,  1, 1), new THREE.Vector3(0,  1, 0), 10)
-      tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, -1, 1), new THREE.Vector3(0, -1, 0), 10)
-
-      # z-side
-      tileSquare(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, -1), new THREE.Vector3(0, 0,  1), 10)
-      tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3(1, 1,  1), new THREE.Vector3(0, 0, -1), 10)
-    ]
+    # @_sphereFaceGeometries = [
+    #   # +x
+    #   tileSquare(new THREE.Vector3( 1,  1,  1), new THREE.Vector3( 1, -1, -1), new THREE.Vector3( 1, 0, 0), 10)
+    #   # -x
+    #   tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3(-1, -1,  1), new THREE.Vector3(-1, 0, 0), 10)
+    #   # +y
+    #   tileSquare(new THREE.Vector3(-1,  1, -1), new THREE.Vector3( 1,  1,  1), new THREE.Vector3(0,  1, 0), 10)
+    #   # -y
+    #   tileSquare(new THREE.Vector3(-1, -1,  1), new THREE.Vector3( 1, -1, -1), new THREE.Vector3(0, -1, 0), 10)
+    #   # +z
+    #   tileSquare(new THREE.Vector3(-1,  1,  1), new THREE.Vector3( 1, -1,  1), new THREE.Vector3(0, 0,  1), 10)
+    #   # -z
+    #   tileSquare(new THREE.Vector3( 1,  1, -1), new THREE.Vector3(-1, -1, -1), new THREE.Vector3(0, 0, -1), 10)
+    # ]
 
     for faceGeometry in @_sphereFaceGeometries
       g.merge faceGeometry, faceGeometry.matrix
