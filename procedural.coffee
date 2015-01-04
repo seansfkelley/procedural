@@ -38,6 +38,28 @@ sphere.toSphere()
 setInterval sphere.toCube, 5000
 setTimeout (-> setInterval sphere.toSphere, 5000), 2500
 
+AXIS_LENGTH = 5
+
+for { color, axis } in [
+  color : 0xff0000
+  axis  : 'x'
+,
+  color : 0x00ff00
+  axis  : 'y'
+,
+  color : 0x0000ff
+  axis  : 'z'
+]
+  size = new THREE.Vector3 0.5, 0.5, 0.5
+  size[axis] = AXIS_LENGTH
+  mesh = new THREE.Mesh(
+    # Based on http://stackoverflow.com/a/14378462; need to have the null here for some reason.
+    new (Function.prototype.bind.apply(THREE.BoxGeometry, [ null ].concat size.toArray()))
+    new THREE.MeshBasicMaterial { color }
+  )
+  mesh.position[axis] = AXIS_LENGTH / 2
+  scene.add mesh
+
 clock = new THREE.Clock
 render = ->
   delta = clock.getDelta()
