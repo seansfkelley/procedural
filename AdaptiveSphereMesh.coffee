@@ -59,7 +59,7 @@ class window.QuadtreeMesh extends THREE.Object3D
   refocus : (nearestPoint2d) ->
     @_quadtree.refocus nearestPoint2d
 
-[ QUADRANT_NE, QUADRANT_NW, QUADRANT_SW, QUADRANT_SE ] = [0...4]
+[ QUADRANT_NE, QUADRANT_NW, QUADRANT_SW, QUADRANT_SE ] = QUADRANTS = [0...4]
 
 class QuadtreeMeshNode extends THREE.Object3D
   constructor : (vertices, vertices2d, material = null, depth = 0) ->
@@ -70,8 +70,12 @@ class QuadtreeMeshNode extends THREE.Object3D
       _nodeVertices = vertices
     else
       # Add to geometry.
-      _nodeVertices = @_simplifyVerticesToDepth vertices, depth
+      _nodeVertices      = @_simplifyVerticesToDepth vertices, depth
+      @_center           = @_computeCenter vertices2d
       @_quadtreeChildren = @_computeQuadtreeChildren vertices, vertices2d, material, depth
+
+      # Quadtree nodes are by default empty
+      @add.apply this, @_quadtreeChildren
 
     @_nodeMesh = new THREE.Mesh(
       # TODO: How do we save the geometry that corresponds to these vertices? Currently there
@@ -85,31 +89,37 @@ class QuadtreeMeshNode extends THREE.Object3D
   # Need better name.
   refocus : (nearestPoint2d) ->
     if @_quadtreeChildren?
-      @remove @_nodeMesh
-      if @_nearEnoughToRecurse()
-        # Figure out where to recurse, add the other three meshes and refocus the last one.
+      @enableMesh false
+      if not @_nearEnoughToRecurse nearestPoint2d
+        @enableMesh true
       else
-        @add @_nodeMesh
+        nearestQuadrant = @_getQuadrant nearestPoint2d
+        for quadrant in QUADRANTS
+          if quadrant == nearestQuadrant
+            @_quadtreeChildren[quadrant].refocus nearestPoint2d
+          else
+            @_quadtreeChildren[quadrant].enableMesh true
     # Else, nothing to do: we're a leaf.
 
-  _nearEnoughToRecurse : -> false
+  enableMesh : (enable) ->
+    if enable
+      @add @_nodeMesh
+    else
+      @remove @_nodeMesh
+
+  _nearEnoughToRecurse : (nearestPoint2d) -> false
 
   _computeQuadtreeChildren : (vertices, vertices2d, material, depth) ->
-    center = @_getCenter vertices2d
     corners = [0...4].map -> { vertices : [], vertices2d : [] }
 
     for v, i in vertices2d
-      cornerIndex = switch
-        when v.x >  center.x and v.y >  center.y then QUADRANT_NE
-        when v.x >  center.x and v.y <= center.y then QUADRANT_NW
-        when v.x <= center.x and v.y <= center.y then QUADRANT_SW
-        else QUADRANT_SE
+      cornerIndex = @_getQuadrant v
       corners[cornerIndex].vertices.push vertices[i]
       corners[cornerIndex].vertices2d.push v
 
     return corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, vertices2d, material, depth + 1
 
-  _getCenter : (vertices2d) ->
+  _computeCenter : (vertices2d) ->
     lowCorner  = new THREE.Vector2  Infinity,  Infinity
     highCorner = new THREE.Vector2 -Infinity, -Infinity
 
@@ -118,6 +128,13 @@ class QuadtreeMeshNode extends THREE.Object3D
       highCorner.max v
 
     return new THREE.Vector2().addVectors(lowCorner, highCorner).divideScalar 2
+
+  _getQuadrant : (p) ->
+    return switch
+      when p.x >  @_center.x and p.y >  @_center.y then QUADRANT_NE
+      when p.x >  @_center.x and p.y <= @_center.y then QUADRANT_NW
+      when p.x <= @_center.x and p.y <= @_center.y then QUADRANT_SW
+      else QUADRANT_SE
 
   _simplifyVerticesToDepth : (vertices, depth) ->
     return []
