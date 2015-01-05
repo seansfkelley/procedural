@@ -42,11 +42,6 @@ Axes.addToScene scene
 sphere = new AdaptiveSphereMesh new THREE.MeshBasicMaterial { color : 0x00ff00, wireframe : true }
 scene.add sphere
 
-sphere.toSphere()
-
-setInterval sphere.toCube, 5000
-setTimeout (-> setInterval sphere.toSphere, 5000), 2500
-
 # INDICATORS
 sphereIndicator = new THREE.Mesh(
   new THREE.SphereGeometry 1

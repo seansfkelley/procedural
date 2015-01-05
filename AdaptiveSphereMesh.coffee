@@ -36,11 +36,70 @@ tileSquare = (corner1, corner2, normal, segments) ->
 
 sign = (n) -> `n < 0 ? -1 : (n > 0 ? 1 : 0)`
 
-class window.AdaptiveSphereMesh extends THREE.Mesh
+class window.QuadtreeMesh extends THREE.Object3D
+  constructor : (geometry, axis, material = null) ->
+    # Discovered this myself. Others have the same issue:
+    # http://blog.olav.it/post/44702519698/subclassing-three-js-objects-in-coffeescript
+    THREE.Object3D.call this
+    @_buildQuadtree geometry.vertices, axis
+
+  _buildQuadtree : (vertices, axis) ->
+    axesToKeep = _.without [ 'x', 'y', 'z' ], axis
+
+    # These Vector2s are a "projection" into 2D space, but mostly logically speaking --
+    # it's possible that the z coordinate gets mapped onto one named x or y, but we only
+    # need this abstraction for assigning groups. I don't think it can be used for
+    # physical positioning at all.
+    vertices2d = vertices.map (v) -> new THREE.Vector2 v[axesToKeep[0]], v[axesToKeep[1]]
+
+    @_quadtree = new QuadtreeMeshNode vertices, vertices2d
+
+[ QUADRANT_NE, QUADRANT_NW, QUADRANT_SW, QUADRANT_SE ] = [0...4]
+
+class QuadtreeMeshNode extends THREE.Object3D
+  constructor : (vertices, vertices2d, depth = 0) ->
+    THREE.Object3D.call this
+
+    if vertices.length > 20
+      @vertices = @_simplifyVerticesToDepth vertices, depth
+    else
+      # TODO: How do we save the geometry that corresponds to these vertices? Currenly there
+      # is nothing to actually render. :(
+      @vertices = vertices
+      return
+
+    center = @_getCenter vertices2d
+    corners = [0...4].map -> { vertices : [], vertices2d : [] }
+
+    for v, i in vertices2d
+      cornerIndex = switch
+        when v.x >  center.x and v.y >  center.y then QUADRANT_NE
+        when v.x >  center.x and v.y <= center.y then QUADRANT_NW
+        when v.x <= center.x and v.y <= center.y then QUADRANT_SW
+        else QUADRANT_SE
+      corners[cornerIndex].vertices.push vertices[i]
+      corners[cornerIndex].vertices2d.push v
+
+    @_quadtreeChildren = corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, vertices2d, depth + 1
+
+  _getCenter : (vertices2d) ->
+    lowCorner  = new THREE.Vector2  Infinity,  Infinity
+    highCorner = new THREE.Vector2 -Infinity, -Infinity
+
+    for v in vertices2d
+      lowCorner.min  v
+      highCorner.max v
+
+    return new THREE.Vector2().addVectors(lowCorner, highCorner).divideScalar 2
+
+  _simplifyVerticesToDepth : (vertices, depth) ->
+    return []
+
+class window.AdaptiveSphereMesh extends THREE.Object3D
   @SPHERE_RADIUS : 25
 
   constructor : (material = null) ->
-    g = new THREE.Geometry
+    THREE.Object3D.call this
 
     # +z is into the screen, but only for cube mapping. Normally it's out of the screen.
     # OpenGL directionality here such that when mapped onto the standard flat texture origin is always bottom-left:
@@ -55,7 +114,7 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
     #      | -y |                    |  ↗  |
     #      |____|                    |↗____|
     #
-    @_sphereFaceGeometries = [
+    @_sphereFaceMeshes = [
       origin    : new THREE.Vector3( 1, -1,  1)
       face      : 'x'
       direction : 1
@@ -79,32 +138,21 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
       origin    : new THREE.Vector3( 1, -1, -1)
       face      : 'z'
       direction : -1
-    ].map ({ origin, face, direction }) ->
+    ].map ({ origin, face, direction }) =>
       normal = new THREE.Vector3
       normal[face] = direction
       target = origin.clone().negate().multiplyScalar(2).add(origin)
       target[face] = direction
-      return tileSquare(origin, target, normal, 10)
+      g = tileSquare(origin, target, normal, 50)
+      for v in g.vertices
+        v.setLength @constructor.SPHERE_RADIUS
+      return new QuadtreeMesh g, face, material
 
-    for faceGeometry in @_sphereFaceGeometries
-      g.merge faceGeometry, faceGeometry.matrix
+    for m in @_sphereFaceMeshes
+      console.log m
+      @add m
 
-    # Discovered this myself. Others have the same issue:
-    # http://blog.olav.it/post/44702519698/subclassing-three-js-objects-in-coffeescript
-    THREE.Mesh.call this, g, material
-
-    @toSphere()
-
-  toSphere : =>
-    for v in @geometry.vertices
-      v.setLength @constructor.SPHERE_RADIUS
-    @geometry.verticesNeedUpdate = true
-
-  toCube : =>
-    for v in @geometry.vertices
-      face = @_getFace v
-      v.multiplyScalar @constructor.SPHERE_RADIUS / Math.abs(v[face])
-    @geometry.verticesNeedUpdate = true
+    return # loop
 
   _getFace : (v) ->
     [ x, y, z ] = v.toArray().map Math.abs
@@ -117,7 +165,7 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
     throw new Error 'math is hard'
 
   projectOntoSphere : (v) ->
-    return v.clone().sub(@position).normalize().multiplyScalar(@constructor.SPHERE_RADIUS)
+    return v.clone().sub(@position).setLength(@constructor.SPHERE_RADIUS)
 
   projectOntoCube : (v) ->
     return @projectOntoSphere(v).multiplyScalar(@constructor.SPHERE_RADIUS / Math.abs(v[@_getFace(v)]))
