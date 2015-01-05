@@ -37,6 +37,8 @@ tileSquare = (corner1, corner2, normal, segments) ->
 sign = (n) -> `n < 0 ? -1 : (n > 0 ? 1 : 0)`
 
 class window.AdaptiveSphereMesh extends THREE.Mesh
+  @SPHERE_RADIUS : 25
+
   constructor : (material = null) ->
     g = new THREE.Geometry
 
@@ -95,13 +97,13 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
 
   toSphere : =>
     for v in @geometry.vertices
-      v.setLength 25
+      v.setLength @constructor.SPHERE_RADIUS
     @geometry.verticesNeedUpdate = true
 
   toCube : =>
     for v in @geometry.vertices
       face = @_getFace v
-      v.multiplyScalar 25 / Math.abs(v[face])
+      v.multiplyScalar @constructor.SPHERE_RADIUS / Math.abs(v[face])
     @geometry.verticesNeedUpdate = true
 
   _getFace : (v) ->
@@ -113,3 +115,9 @@ class window.AdaptiveSphereMesh extends THREE.Mesh
     else if z >= x and z >= y
       return 'z'
     throw new Error 'math is hard'
+
+  projectOntoSphere : (v) ->
+    return v.clone().sub(@position).normalize().multiplyScalar(@constructor.SPHERE_RADIUS)
+
+  projectOntoCube : (v) ->
+    return @projectOntoSphere(v).multiplyScalar(@constructor.SPHERE_RADIUS / Math.abs(v[@_getFace(v)]))

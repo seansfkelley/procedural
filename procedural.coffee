@@ -35,6 +35,10 @@ setupPointerLock()
 
 # ----- SETUP SCENE CONTENTS -----
 
+# AXES
+Axes.addToScene scene
+
+# SPHERE
 sphere = new AdaptiveSphereMesh new THREE.MeshBasicMaterial { color : 0x00ff00, wireframe : true }
 scene.add sphere
 
@@ -43,7 +47,18 @@ sphere.toSphere()
 setInterval sphere.toCube, 5000
 setTimeout (-> setInterval sphere.toSphere, 5000), 2500
 
-Axes.addToScene scene
+# INDICATORS
+sphereIndicator = new THREE.Mesh(
+  new THREE.SphereGeometry 1
+  new THREE.MeshBasicMaterial { color : 0xff0000, wireframe : true }
+)
+
+cubeIndicator = new THREE.Mesh(
+  new THREE.BoxGeometry 1, 1, 1
+  new THREE.MeshBasicMaterial { color : 0x0000ff, wireframe : true }
+)
+
+scene.add sphereIndicator, cubeIndicator
 
 # ----- MAIN LOOP -----
 
@@ -52,6 +67,9 @@ render = ->
   delta = clock.getDelta()
 
   controls.update delta
+
+  sphereIndicator.position.copy sphere.projectOntoSphere(camera.position)
+  cubeIndicator.position.copy sphere.projectOntoCube(camera.position)
 
   requestAnimationFrame render
   renderer.render scene, camera
