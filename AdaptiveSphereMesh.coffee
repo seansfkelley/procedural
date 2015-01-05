@@ -41,9 +41,11 @@ class window.QuadtreeMesh extends THREE.Object3D
     # Discovered this myself. Others have the same issue:
     # http://blog.olav.it/post/44702519698/subclassing-three-js-objects-in-coffeescript
     THREE.Object3D.call this
-    @_buildQuadtree geometry.vertices, axis
 
-  _buildQuadtree : (vertices, axis) ->
+    @_buildQuadtree geometry.vertices, axis, material
+    @add @_quadtree
+
+  _buildQuadtree : (vertices, axis, material) ->
     axesToKeep = _.without [ 'x', 'y', 'z' ], axis
 
     # These Vector2s are a "projection" into 2D space, but mostly logically speaking --
@@ -52,22 +54,47 @@ class window.QuadtreeMesh extends THREE.Object3D
     # physical positioning at all.
     vertices2d = vertices.map (v) -> new THREE.Vector2 v[axesToKeep[0]], v[axesToKeep[1]]
 
-    @_quadtree = new QuadtreeMeshNode vertices, vertices2d
+    @_quadtree = new QuadtreeMeshNode vertices, vertices2d, material
+
+  refocus : (nearestPoint2d) ->
+    @_quadtree.refocus nearestPoint2d
 
 [ QUADRANT_NE, QUADRANT_NW, QUADRANT_SW, QUADRANT_SE ] = [0...4]
 
 class QuadtreeMeshNode extends THREE.Object3D
-  constructor : (vertices, vertices2d, depth = 0) ->
+  constructor : (vertices, vertices2d, material = null, depth = 0) ->
     THREE.Object3D.call this
 
-    if vertices.length > 20
-      @vertices = @_simplifyVerticesToDepth vertices, depth
+    if vertices.length < 20
+      # Add to geometry, unless I can just replace it?
+      _nodeVertices = vertices
     else
-      # TODO: How do we save the geometry that corresponds to these vertices? Currenly there
-      # is nothing to actually render. :(
-      @vertices = vertices
-      return
+      # Add to geometry.
+      _nodeVertices = @_simplifyVerticesToDepth vertices, depth
+      @_quadtreeChildren = @_computeQuadtreeChildren vertices, vertices2d, material, depth
 
+    @_nodeMesh = new THREE.Mesh(
+      # TODO: How do we save the geometry that corresponds to these vertices? Currently there
+      # is nothing to actually render. :( Must use _nodeGeometry.
+      new THREE.Geometry
+      material
+    )
+
+    @add @_nodeMesh
+
+  # Need better name.
+  refocus : (nearestPoint2d) ->
+    if @_quadtreeChildren?
+      @remove @_nodeMesh
+      if @_nearEnoughToRecurse()
+        # Figure out where to recurse, add the other three meshes and refocus the last one.
+      else
+        @add @_nodeMesh
+    # Else, nothing to do: we're a leaf.
+
+  _nearEnoughToRecurse : -> false
+
+  _computeQuadtreeChildren : (vertices, vertices2d, material, depth) ->
     center = @_getCenter vertices2d
     corners = [0...4].map -> { vertices : [], vertices2d : [] }
 
@@ -80,7 +107,7 @@ class QuadtreeMeshNode extends THREE.Object3D
       corners[cornerIndex].vertices.push vertices[i]
       corners[cornerIndex].vertices2d.push v
 
-    @_quadtreeChildren = corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, vertices2d, depth + 1
+    return corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, vertices2d, material, depth + 1
 
   _getCenter : (vertices2d) ->
     lowCorner  = new THREE.Vector2  Infinity,  Infinity
