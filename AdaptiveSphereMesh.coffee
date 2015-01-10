@@ -42,10 +42,10 @@ class window.QuadtreeMesh extends THREE.Object3D
     # http://blog.olav.it/post/44702519698/subclassing-three-js-objects-in-coffeescript
     THREE.Object3D.call this
 
-    @_buildQuadtree geometry.vertices, axis, material
+    @_buildQuadtree geometry.vertices, geometry.faces, axis, material
     @add @_quadtree
 
-  _buildQuadtree : (vertices, axis, material) ->
+  _buildQuadtree : (vertices, faces, axis, material) ->
     axesToKeep = _.without [ 'x', 'y', 'z' ], axis
 
     # These Vector2s are a "projection" into 2D space, but mostly logically speaking --
@@ -54,7 +54,7 @@ class window.QuadtreeMesh extends THREE.Object3D
     # physical positioning at all.
     vertices2d = vertices.map (v) -> new THREE.Vector2 v[axesToKeep[0]], v[axesToKeep[1]]
 
-    @_quadtree = new QuadtreeMeshNode vertices, vertices2d, material
+    @_quadtree = new QuadtreeMeshNode vertices, faces, vertices2d, material
 
   refocus : (nearestPoint2d) ->
     @_quadtree.refocus nearestPoint2d
@@ -62,29 +62,25 @@ class window.QuadtreeMesh extends THREE.Object3D
 [ QUADRANT_NE, QUADRANT_NW, QUADRANT_SW, QUADRANT_SE ] = QUADRANTS = [0...4]
 
 class QuadtreeMeshNode extends THREE.Object3D
-  constructor : (vertices, vertices2d, material = null, depth = 0) ->
+  constructor : (vertices, vertices2d, faces, material = null, depth = 0) ->
     THREE.Object3D.call this
 
-    if vertices.length < 20
-      # Add to geometry, unless I can just replace it?
-      _nodeVertices = vertices
-    else
-      # Add to geometry.
-      _nodeVertices      = @_simplifyVerticesToDepth vertices, depth
-      @_center           = @_computeCenter vertices2d
-      @_quadtreeChildren = @_computeQuadtreeChildren vertices, vertices2d, material, depth
+    if vertices.length > 20
+      @_center            = @_computeCenter vertices2d
+      @_quadtreeChildren  = @_computeQuadtreeChildren vertices, faces, vertices2d, material, depth
+      { vertices, faces } = @_simplifyVerticesToDepth vertices, faces, depth
 
-      # Quadtree nodes are by default empty
+      # Quadtree nodes are by default empty.
       @add.apply this, @_quadtreeChildren
 
+    geometry = new THREE.Geometry
+    geometry.vertices.push vertices...
+    geometry.faces.push faces...
+
     @_nodeMesh = new THREE.Mesh(
-      # TODO: How do we save the geometry that corresponds to these vertices? Currently there
-      # is nothing to actually render. :( Must use _nodeGeometry.
-      new THREE.Geometry
+      geometry
       material
     )
-
-    @add @_nodeMesh
 
   # Need better name.
   refocus : (nearestPoint2d) ->
@@ -109,15 +105,23 @@ class QuadtreeMeshNode extends THREE.Object3D
 
   _nearEnoughToRecurse : (nearestPoint2d) -> false
 
-  _computeQuadtreeChildren : (vertices, vertices2d, material, depth) ->
-    corners = [0...4].map -> { vertices : [], vertices2d : [] }
+  _computeQuadtreeChildren : (vertices, faces, vertices2d, material, depth) ->
+    corners = [0...4].map -> { vertices : [], faces : [], vertices2d : [] }
+
+    facesByVertexIndex = {}
+    for f in faces
+      (facesByVertexIndex[f.a] ?= []).push f
+      (facesByVertexIndex[f.b] ?= []).push f
+      (facesByVertexIndex[f.c] ?= []).push f
 
     for v, i in vertices2d
-      cornerIndex = @_getQuadrant v
-      corners[cornerIndex].vertices.push vertices[i]
-      corners[cornerIndex].vertices2d.push v
+      c = corners[@_getQuadrant(v)]
+      c.vertices.push vertices[i]
+      # How do we figure out which faces this corresponds to?
+      # c.faces.push faces[i]
+      c.vertices2d.push v
 
-    return corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, vertices2d, material, depth + 1
+    return corners.map ({ vertices, vertices2d }) -> new QuadtreeMeshNode vertices, faces, vertices2d, material, depth + 1
 
   _computeCenter : (vertices2d) ->
     lowCorner  = new THREE.Vector2  Infinity,  Infinity
@@ -136,8 +140,11 @@ class QuadtreeMeshNode extends THREE.Object3D
       when p.x <= @_center.x and p.y <= @_center.y then QUADRANT_SW
       else QUADRANT_SE
 
-  _simplifyVerticesToDepth : (vertices, depth) ->
-    return []
+  _simplifyVerticesToDepth : (vertices, faces, depth) ->
+    simplifiedVertices = []
+    simplifiedFaces    = []
+    # How to pick the right vertices?
+    return { vertices : simplifiedVertices, faces : simplifiedFaces }
 
 class window.AdaptiveSphereMesh extends THREE.Object3D
   @SPHERE_RADIUS : 25
